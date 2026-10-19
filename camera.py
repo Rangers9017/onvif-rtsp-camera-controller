@@ -21,12 +21,12 @@ class CameraApp(QMainWindow):
         self.setWindowTitle("rtsptool")
         self.setGeometry(100, 100, 800, 600)
         
-        # Kamera bilgileri
-        self.camera_ip = '192.168.0.0'
+        # Kamera bilgileri. Kendi bilgilerinizi yerel olarak girin; repoya eklemeyin.
+        self.camera_ip = ''
         self.camera_port = 80  # ONVIF port
         self.rtsp_port = 554   # RTSP port
-        self.username = 'admin'
-        self.password = 'admin'
+        self.username = ''
+        self.password = ''
         
         # ONVIF timeout ve transport ayarları
         self.session = Session()
@@ -116,30 +116,17 @@ class CameraApp(QMainWindow):
     def adjust_brightness(self, value):
         try:
             if hasattr(self, 'imaging'):
-                # Parlaklık değerini güncelle
                 self.brightness_value.setText(str(value))
-
-                # Video kaynağı tokenini al
                 video_source = self.media.GetVideoSources()[0]
-
-                # Imaging settings oluştur
                 request = self.imaging.create_type('SetImagingSettings')
                 request.VideoSourceToken = video_source.token
-
-                # Mevcut imaging ayarlarını al
                 imaging_settings = self.imaging.GetImagingSettings({'VideoSourceToken': video_source.token})
-
-                # Yeni parlaklık değerini ayarla
                 imaging_settings.Brightness = float(value)
                 request.ImagingSettings = imaging_settings
                 request.ForcePersistence = True
-
-                # Yeni ayarları gönder
                 self.imaging.SetImagingSettings(request)
-
                 print(f"Parlaklık ayarlandı: {value}")
                 print("Parlaklık ayarı gönderildi")
-
             else:
                 print("Imaging servisi mevcut değil.")
         except zeep.exceptions.Fault as e:
@@ -153,24 +140,14 @@ class CameraApp(QMainWindow):
     def set_ir_cut_filter_mode(self, mode):
         try:
             if hasattr(self, 'imaging'):
-                # Video kaynağı tokenini al
                 video_source = self.media.GetVideoSources()[0]
-
-                # Imaging settings oluştur
                 request = self.imaging.create_type('SetImagingSettings')
                 request.VideoSourceToken = video_source.token
-
-                # Mevcut imaging ayarlarını al
                 imaging_settings = self.imaging.GetImagingSettings({'VideoSourceToken': video_source.token})
-
-                # IR Cut Filter modunu ayarla
-                imaging_settings.IRCutFilter = mode  # 'ON', 'OFF' veya 'AUTO' olabilir
+                imaging_settings.IRCutFilter = mode
                 request.ImagingSettings = imaging_settings
                 request.ForcePersistence = True
-
-                # Yeni ayarları gönder
                 self.imaging.SetImagingSettings(request)
-
                 print(f"IR Cut Filter modu ayarlandı: {mode}")
             else:
                 print("Imaging servisi mevcut değil.")
@@ -183,7 +160,6 @@ class CameraApp(QMainWindow):
 
     def toggle_camera(self):
         if not self.is_camera_active:
-            # URL'i input'tan al
             rtsp_url = self.url_input.text().strip()
             if not rtsp_url.startswith('rtsp://'):
                 QMessageBox.warning(self, "Hata", "Geçerli bir RTSP URL'i giriniz!")
@@ -214,11 +190,8 @@ class CameraApp(QMainWindow):
                 print("PTZ servisi veya media profili bulunamadı!")
                 return
                 
-            # PTZ request oluştur
             request = self.ptz.create_type('ContinuousMove')
             request.ProfileToken = self.media_profile.token
-            
-            # Velocity ayarla
             request.Velocity = self.ptz.create_type('PTZSpeed')
             
             if zoom != 0:
@@ -226,7 +199,6 @@ class CameraApp(QMainWindow):
                 request.Velocity.Zoom.x = float(zoom)
                 print(f"Zoom request ayarlandı: {request.Velocity.Zoom.x}")
             
-            # Request'i gönder
             print("PTZ isteği gönderiliyor...")
             response = self.ptz.ContinuousMove(request)
             print(f"PTZ yanıtı: {response}")
@@ -250,93 +222,71 @@ class CameraApp(QMainWindow):
             print(f"PTZ durdurma hatası: {e}")
 
     def setup_ui(self):
-        # Ana widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Ana horizontal layout
         main_layout = QHBoxLayout(central_widget)
-        
-        # Sol panel (kamera görüntüsü ve kontroller)
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        
-        # Kontrol butonları için horizontal layout
         control_layout = QHBoxLayout()
         
-        # RTSP URL input
         self.url_input = QLineEdit()
-        self.url_input.setPlaceholderText("rtsp://username:password@ip:port/stream")
-        self.url_input.setText(f"rtsp://192.168.1.192:554/user=admin_password=Xms9XJIs_channel=1_stream=1.sdp?real_stream")
+        self.url_input.setPlaceholderText("rtsp://kullanici:sifre@kamera-adresi:554/yayin-yolu")
         self.url_input.setMinimumWidth(400)
         
-        # Bağlantı durum göstergesi
         self.status_indicator = QPushButton()
         self.status_indicator.setFixedSize(20, 20)
         self.status_indicator.setEnabled(False)
         self.set_status_color("red")
         
-        # Başlat/Durdur butonu
         self.connect_button = QPushButton("Bağlan")
         self.connect_button.clicked.connect(self.toggle_camera)
         
-        # Kontrol layout'una ekle
         control_layout.addWidget(QLabel("RTSP URL:"))
         control_layout.addWidget(self.url_input)
         control_layout.addWidget(self.status_indicator)
         control_layout.addWidget(self.connect_button)
         
-        # Kamera görüntüsü için label
         self.image_label = QLabel()
         self.image_label.setStyleSheet("QLabel { background-color: black; }")
         
-        # Sol panel layout'una ekle
         left_layout.addLayout(control_layout)
         left_layout.addWidget(self.image_label)
         
-        # Sağ panel (kamera bilgileri ve gece görüş kontrolü)
         right_panel = QWidget()
         right_panel.setMaximumWidth(300)
         right_layout = QFormLayout(right_panel)
-        right_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Kamera bilgi alanları
         self.ip_input = QLineEdit(self.camera_ip)
         self.port_input = QLineEdit(str(self.camera_port))
         self.rtsp_port_input = QLineEdit(str(self.rtsp_port))
         self.username_input = QLineEdit(self.username)
         self.password_input = QLineEdit(self.password)
-        #self.password_input.setEchoMode(QLineEdit.Password) /şiifre gizleme
+        self.password_input.setEchoMode(QLineEdit.Password)
         
-        # Sağ panel form layout'una ekle
         right_layout.addRow("IP Adresi:", self.ip_input)
         right_layout.addRow("ONVIF Port:", self.port_input)
         right_layout.addRow("RTSP Port:", self.rtsp_port_input)
         right_layout.addRow("Kullanıcı Adı:", self.username_input)
         right_layout.addRow("Şifre:", self.password_input)
         
-        # Gece görüş modu kontrolü
         night_vision_layout = QHBoxLayout()
         self.night_vision_button = QPushButton("Gece Görüşü Aç/Kapat")
         self.night_vision_button.clicked.connect(self.toggle_night_vision)
         night_vision_layout.addWidget(self.night_vision_button)
         right_layout.addRow("", night_vision_layout)
         
-        # Ana layout'a panelleri ekle
         main_layout.addWidget(left_panel)
         main_layout.addWidget(right_panel)
 
     def toggle_night_vision(self):
-        # Gece görüş modunu değiştir
         try:
-            # Modu almak veya tutmak için bir değişken kullanabilirsiniz
             if not hasattr(self, 'night_vision_on'):
                 self.night_vision_on = False
 
             new_mode = 'ON' if not self.night_vision_on else 'OFF'
             self.set_ir_cut_filter_mode(new_mode)
             self.night_vision_on = not self.night_vision_on
-
             print(f"Gece görüş modu {'açıldı' if self.night_vision_on else 'kapatıldı'}")
         except Exception as e:
             print(f"Gece görüş modu değiştirme hatası: {e}")
@@ -365,18 +315,13 @@ class CameraApp(QMainWindow):
         try:
             ret, frame = self.cap.read()
             if ret:
-                # Parlaklık değerini al
-                
-                # Parlaklık ayarı (-50 ile +50 arasında)
-               
-                
                 rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 h, w, ch = rgb_image.shape
                 bytes_per_line = ch * w
                 qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format_RGB888)
                 scaled_pixmap = QPixmap.fromImage(qt_image).scaled(
-                    self.image_label.size(), 
-                    Qt.KeepAspectRatio, 
+                    self.image_label.size(),
+                    Qt.KeepAspectRatio,
                     Qt.SmoothTransformation
                 )
                 self.image_label.setPixmap(scaled_pixmap)
@@ -389,28 +334,24 @@ class CameraApp(QMainWindow):
             
     def update_camera_info(self):
         try:
-            # Get values from inputs
             self.camera_ip = self.ip_input.text().strip()
             self.camera_port = int(self.port_input.text().strip())
             self.rtsp_port = int(self.rtsp_port_input.text().strip())
             self.username = self.username_input.text().strip()
             self.password = self.password_input.text().strip()
             
-            # Update RTSP URL
             new_rtsp_url = f"rtsp://{self.username}:{self.password}@{self.camera_ip}:{self.rtsp_port}/cam/realmonitor?channel=1&subtype=0"
             self.url_input.setText(new_rtsp_url)
             
-            # If camera is connected, disconnect first
             if self.is_camera_active:
                 self.stop_camera()
                 
-            # Try to setup new ONVIF connection
             self.setup_onvif_connection()
             self.get_camera_capabilities()
             
             QMessageBox.information(self, "Başarılı", "Kamera bilgileri güncellendi!")
             
-        except ValueError as e:
+        except ValueError:
             QMessageBox.warning(self, "Hata", "Port numaraları sayı olmalıdır!")
         except Exception as e:
             QMessageBox.warning(self, "Hata", f"Güncelleme başarısız: {str(e)}")
